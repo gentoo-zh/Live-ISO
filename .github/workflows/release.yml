@@ -18,10 +18,6 @@ jobs:
           submodules: 'true'
           path: ${{ github.workspace }}/${{ github.run_id }}
 
-      - name: Install Dependencies
-        run: |
-          sudo apt update
-          sudo apt -y install m4 wget xz-utils git rsync make squashfs-tools asciidoc
       - name: Build ISO
         run: |
           sudo bash -x ./build.sh
