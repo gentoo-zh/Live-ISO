@@ -171,6 +171,9 @@ if ( ! crun which git);then
 fi
 syncrepo
 
+# sync full extra staff
+rsync -rl --copy-unsafe-links "${WORKDIR}"/include-squashfs/* "${WORKDIR}/squashfs/"
+
 refreshconfig
 
 # upgrade system
