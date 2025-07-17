@@ -23,4 +23,5 @@ sys-kernel/gentoo-kernel-bin
 sys-kernel/linux-firmware
 sys-process/btop
 www-client/firefox-bin
+net-proxy/flclash
 x11-misc/sddm
