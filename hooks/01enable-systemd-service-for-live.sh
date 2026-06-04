@@ -2,9 +2,22 @@
 
 # NetworkManager
 crun systemctl enable NetworkManager
+# 屏蔽 initramfs 专用的 NetworkManager-initrd.service：它与 NetworkManager.service 都声明
+# BusName=org.freedesktop.NetworkManager。dmsquash-live 经 initrd→realroot 切换后两者会同时
+# 被加载，systemd 报 "Two services allocated for the same bus name, refusing operation" →
+# NetworkManager.service 开机加载失败、网络不自起、要手动 systemctl restart 才行。
+# 本地介质启动的 live/装机系统不需要 initrd 内联网络，屏蔽它即可根除冲突。
+# （另见 buildbootfiles 的 dracut --omit network-manager：从源头不把 NM 放进 initramfs。）
+crun systemctl mask NetworkManager-initrd.service
 
 # Sddm
 crun systemctl enable sddm
+
+# PipeWire 音频栈(per-user,用 --global 给所有用户建 user-unit 软链)。
+# 默认未使能时 live 桌面进去就是「声卡服务连接丧失」/无声;wireplumber 是会话管理器,
+# pipewire-pulse 提供 PulseAudio 兼容(KDE 音量控件走它)。三者必须一起 enable。
+# 注:装好的系统同样需要声音 → 故意【不】放进 calamares 清理(它只删 live 专属残留)。
+crun systemctl --global enable pipewire.socket pipewire-pulse.socket wireplumber.service
 
 # Live 开机语言切换(读 gigos.lang= 内核参数,在 sddm 前设 locale/Plasma 语言)
 chmod +x "${WORKDIR}/squashfs/usr/local/bin/gigos-live-lang.sh"
@@ -25,3 +38,13 @@ chmod 0755 "${WORKDIR}/squashfs/etc/skel/Desktop/calamares.desktop"
 # 桌面「启动 SSH」两个按钮(允许密码登录 / 仅密钥)+ 其前后端脚本设可执行(live 调试用)
 chmod +x "${WORKDIR}/squashfs/usr/local/bin/gigos-ssh.sh" "${WORKDIR}/squashfs/usr/local/bin/gigos-ssh-button.sh"
 chmod 0755 "${WORKDIR}/squashfs/etc/skel/Desktop/gigos-ssh-password.desktop" "${WORKDIR}/squashfs/etc/skel/Desktop/gigos-ssh-keyonly.desktop"
+
+# 桌面「关闭自动休眠和锁屏」按钮 + 脚本设可执行(装机不被 15min 自动休眠/锁屏打断;
+# skel 已默认禁休眠/锁屏,本按钮供显式一键确保+即时生效;装好的系统由 calamares 复位回 KDE 默认)
+chmod +x "${WORKDIR}/squashfs/usr/local/bin/gigos-nosleep.sh"
+chmod 0755 "${WORKDIR}/squashfs/etc/skel/Desktop/gigos-nosleep.desktop"
+
+# 桌面「开启 sudo 免密」按钮(前端 pkexec 调 root 后端写 sudoers drop-in)+ 脚本设可执行(live 调试用;
+# 装好的系统由 calamares 删 drop-in/按钮,sudo 恢复需密码)
+chmod +x "${WORKDIR}/squashfs/usr/local/bin/gigos-sudo.sh" "${WORKDIR}/squashfs/usr/local/bin/gigos-sudo-button.sh"
+chmod 0755 "${WORKDIR}/squashfs/etc/skel/Desktop/gigos-sudo-nopasswd.desktop"

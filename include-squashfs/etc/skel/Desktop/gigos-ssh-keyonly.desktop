@@ -1,9 +1,9 @@
 [Desktop Entry]
 Type=Application
 Version=1.0
-Name=Enable SSH (key only)
-Name[zh_CN]=启动 SSH（仅密钥登录）
-Name[zh_TW]=啟動 SSH（僅金鑰登入）
+Name=Enable SSH (key only) · live only
+Name[zh_CN]=启动 SSH（仅密钥登录）· 仅 live
+Name[zh_TW]=啟動 SSH（僅金鑰登入）· 僅 live
 GenericName=SSH server
 GenericName[zh_CN]=SSH 服务
 GenericName[zh_TW]=SSH 服務

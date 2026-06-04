@@ -136,7 +136,11 @@ function buildbootfiles () {
     # 开机后由 gigos-nvidia-load.service 常规 modprobe nvidia 四件套 + 建设备节点(此时 udev 已就绪、
     # /dev/nvidia* 正常创建)。这是 Arch/Gentoo wiki 推荐的常规做法,比 early KMS 简单可靠、
     # 不踩 initramfs 漏建节点(nvidia-smi 连不上、KWin 退软渲)那一串坑。
-    crun dracut --no-hostonly -f --kver "${KVER}" --xz --add dmsquash-live --add dmsquash-live-autooverlay --add crypt -i /lib/keymaps /lib/keymaps || exit 1
+    # --omit network-manager:本地介质启动的 live 不需要 initrd 内联网络;若把 NM 模块打进
+    # initramfs,其 NetworkManager-initrd.service(BusName=org.freedesktop.NetworkManager)会在
+    # initrd 阶段被加载并随 switch-root 带进真根,与真根的 NetworkManager.service 撞同一 BusName,
+    # 导致 systemd 拒载 NM.service → 开机网络不自起。从源头不放进 initramfs 即可根治。
+    crun dracut --no-hostonly -f --kver "${KVER}" --xz --add dmsquash-live --add dmsquash-live-autooverlay --add crypt --omit network-manager -i /lib/keymaps /lib/keymaps || exit 1
 
     # copy the kernel to iso workdir
     mkdir -p "${WORKDIR}/iso/boot"

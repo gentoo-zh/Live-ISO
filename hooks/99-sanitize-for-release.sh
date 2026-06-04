@@ -11,10 +11,13 @@
 
 MC="${WORKDIR}/squashfs/etc/portage/make.conf"
 
-# ① MAKEOPTS 还原为自适应：用户开机后按【自己的】CPU 核数决定并行度。
-#    写入字面量 $(nproc)，portage 每次读 make.conf 时在用户机器上展开。
+# ① MAKEOPTS 还原为安全兜底字面量 -j4。
+#    切勿写 $(nproc):portage 的 make.conf 解析器【不支持】命令替换,会每次 emerge
+#    报 "line N: $: bad substitution" 且 MAKEOPTS 失效。真正的按 CPU 自适应由开机的
+#    gigos-cpuflags.service 写进 make.conf.d/cpuflags(字母序在 common 之后覆盖此值);
+#    -j4 仅是首启动前/服务未跑时的安全兜底(小内存机也不致 OOM)。
 if [ -f "${MC}/common" ]; then
-    sed -i 's/^MAKEOPTS=.*/MAKEOPTS="-j$(nproc) -l$(nproc)"/' "${MC}/common"
+    sed -i 's/^MAKEOPTS=.*/MAKEOPTS="-j4"/' "${MC}/common"
 fi
 
 # ② 移除任何构建机专用的二进制包缓存调优（若构建包装层注入过）。
@@ -78,7 +81,7 @@ done
 #    或被上游覆盖,会出「装好的系统残留 autologin / SSH 密码登录」的后门盘。任一缺失即中止,不出后门盘。
 CSGSP="${WORKDIR}/squashfs/etc/calamares/modules/shellprocess.conf"
 CSGSET="${WORKDIR}/squashfs/etc/calamares/settings.conf"
-for pat in "sddm.conf.d/kde_settings.conf" "49-calamares-nopasswd.rules" "00-gigos-passwordlogin.conf"; do
+for pat in "sddm.conf.d/kde_settings.conf" "49-calamares-nopasswd.rules" "00-gigos-passwordlogin.conf" "gigos-nosleep.desktop" "gigos-sudo-nopasswd.desktop"; do
     grep -q "${pat}" "${CSGSP}" 2>/dev/null || { echo "[99-sanitize] 致命:calamares 装机清理缺 ${pat} → 装好系统会残留 live 后门,中止"; exit 1; }
 done
 grep -qE '^[[:space:]]*-[[:space:]]*shellprocess[[:space:]]*$' "${CSGSET}" 2>/dev/null || { echo "[99-sanitize] 致命:calamares settings.conf 未启用 shellprocess 清理步骤(清理不会跑)→ 中止"; exit 1; }
