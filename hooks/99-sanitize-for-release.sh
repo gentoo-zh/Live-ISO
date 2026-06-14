@@ -50,12 +50,16 @@ cat > "${MC}/cpuflags" <<'CPUF'
 CPU_FLAGS_X86="aes avx avx2 f16c fma3 mmx mmxext pclmul popcnt rdrand sse sse2 sse3 sse4_1 sse4_2 ssse3"
 CPUF
 
-# ④ 出厂 GENTOO_MIRRORS 固定为阿里云（与构建时的就近镜像解耦）。
-#    本 ISO 用户主要在中国大陆 / 香港，出厂给官方源(distfiles.gentoo.org)反而慢，
-#    故出厂统一写阿里云(全国 CDN、稳定、HTTPS)，用户开箱 emerge 即较快；用户在
-#    其他地区可自行 mirrorselect 换源。注意：这与【构建时】用的源无关——构建机在
-#    香港 5Gbps 直连官方源(见 build-and-deploy.sh / config)，此处只决定写进用户系统的值。
-echo 'GENTOO_MIRRORS="https://mirrors.aliyun.com/gentoo"' > "${MC}/mirror"
+# ④ 出厂 GENTOO_MIRRORS：写带标记的【基线】(中国大陆)。开机后 gigos-mirror.service 按系统语言
+#    自动选就近镜像(简→大陆 / 繁→台港 / 英→全球)——我们支持简/繁/英三语,写死单一中国镜像对
+#    繁体、海外用户不友好,故改成「基线 + 按语言自适应」,与 gigos-cpuflags 同套机制。
+#    第一行的标记让 gigos-mirror 知道这是自动值、可覆盖;用户删掉标记即固定为自己的值。
+#    注意：这与【构建时】用的源无关——构建机在香港直连官方源(见 build-and-deploy.sh / config)。
+{
+    echo '# gigos-auto-mirror'
+    echo '# 出厂基线(中国大陆);开机后 gigos-mirror.service 按系统语言覆盖。删除本行标记即停止自动覆盖。'
+    echo 'GENTOO_MIRRORS="https://mirrors.aliyun.com/gentoo/ https://mirrors.tuna.tsinghua.edu.cn/gentoo/ https://mirrors.ustc.edu.cn/gentoo/ https://mirrors.bfsu.edu.cn/gentoo/"'
+} > "${MC}/mirror"
 
 # ⑤ 解除 nvidia.conf 对 nouveau 的【静态】黑名单,让双驱动共存。
 #    nvidia-drivers ebuild 自带 /etc/modprobe.d/nvidia.conf,首行 `blacklist nouveau`

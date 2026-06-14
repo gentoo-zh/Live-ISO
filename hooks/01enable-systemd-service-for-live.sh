@@ -27,6 +27,11 @@ crun systemctl enable gigos-live-lang.service
 chmod +x "${WORKDIR}/squashfs/usr/local/bin/gigos-cpuflags.sh"
 crun systemctl enable gigos-cpuflags.service
 
+# GENTOO_MIRRORS 按系统语言自动选就近镜像(简→大陆 / 繁→台港 / 英→全球;live 与装好的系统通用,
+# 与 gigos-cpuflags 同套机制:出厂带标记基线,开机按语言覆盖 make.conf/mirror,用户删标记即停)
+chmod +x "${WORKDIR}/squashfs/usr/local/bin/gigos-mirror.sh"
+crun systemctl enable gigos-mirror.service
+
 # nvidia 常规加载(闭源 nvidia 启动项传 gigos.gpu=nvidia:开机后 modprobe nvidia 四件套 + 建节点,
 # 非 early KMS;由服务的 ConditionKernelCommandLine 守卫,开源/AMD/Intel 项不命中)
 chmod +x "${WORKDIR}/squashfs/usr/local/bin/gigos-nvidia-load.sh"
