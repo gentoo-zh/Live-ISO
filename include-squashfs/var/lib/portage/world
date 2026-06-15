@@ -45,7 +45,12 @@ sys-fs/cryptsetup
 sys-fs/lvm2
 sys-block/gparted
 sys-block/parted
-# 硬件诊断:inxi 一条命令出完整硬件/驱动报告(运行时自动拉入 pciutils/usbutils/dmidecode)
+sys-fs/mdadm
+# 硬件诊断:inxi 一条命令出完整硬件/驱动报告;usbutils 提供 lsusb
 sys-apps/inxi
+sys-apps/usbutils
+# 系统管理/装后维护:mirrorselect 选最快 GENTOO_MIRRORS;gentoolkit 提供 equery/eclean/revdep-rebuild
+app-portage/mirrorselect
+app-portage/gentoolkit
 # 远程求助:装机求助时 ssh/scp 用
 net-misc/openssh
