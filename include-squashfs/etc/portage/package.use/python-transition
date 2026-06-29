@@ -1,0 +1,4 @@
+# 滚动树 python 3.13→3.14 过渡：官方 stage3 种子还带 3.13，@world 重建期间
+# 这两个共享构建后端要同时供 3.13 + 3.14。官方种子去掉 3.13 后此文件可删。
+>=dev-python/setuptools-scm-10.2.0 python_targets_python3_13
+>=dev-python/vcs-versioning-2.2.0 python_targets_python3_13
