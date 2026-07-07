@@ -153,7 +153,6 @@ function makesquashfs (){
 function buildbootfiles () {
     # make initramfs with live support
     KVER="$(ls "${WORKDIR}/squashfs/lib/modules" | sort -Vr | head -n1)"
-    # -i /lib/keymaps:把键盘布局打进 initramfs(官方 livegui 同款),非美式键盘 live 早期也能输入
     # --xz:与官方 livegui 一致的 initramfs 压缩,体积更小
     #
     # nvidia 闭源驱动不进 initramfs(不走 early KMS):闭源 grub 项传 gigos.gpu=nvidia,
@@ -164,7 +163,7 @@ function buildbootfiles () {
     # initramfs,其 NetworkManager-initrd.service(BusName=org.freedesktop.NetworkManager)会在
     # initrd 阶段被加载并随 switch-root 带进真根,与真根的 NetworkManager.service 撞同一 BusName,
     # 导致 systemd 拒载 NM.service → 开机网络不自起。从源头不放进 initramfs 即可避免。
-    crun dracut --no-hostonly -f --kver "${KVER}" --xz --add dmsquash-live --add dmsquash-live-autooverlay --add crypt --omit network-manager -i /lib/keymaps /lib/keymaps || exit 1
+    crun dracut --no-hostonly -f --kver "${KVER}" --xz --add dmsquash-live --add dmsquash-live-autooverlay --add crypt --omit network-manager || exit 1
 
     # copy the kernel to iso workdir
     mkdir -p "${WORKDIR}/iso/boot"
