@@ -74,6 +74,21 @@ retry () {
     done
 }
 
+# 从 chroot 树的 md5-cache 读某包的最新 amd64-STABLE 版本(精确 token 匹配,区分 amd64 与 ~amd64)。
+# 用 md5-cache 而非 `ACCEPT_KEYWORDS=amd64 emerge`:后者是增量变量,会跟 chroot make.conf 的 "~amd64 *"
+# 累加而非替换、压不住测试版(实机踩过:算出的是 gcc-16 快照 / 内核 7.1.3 / zfs-2.4.3 测试版)。
+# md5-cache 随 gentoo git 树自带,离线可读、与 ACCEPT_KEYWORDS 无关。
+newest_stable () {
+    local cat="${1%/*}" pn="${1#*/}"
+    local mc="${WORKDIR}/squashfs/var/db/repos/gentoo/metadata/md5-cache"
+    local f
+    for f in "${mc}/${cat}/${pn}"-[0-9]*; do
+        [ -f "${f}" ] || continue
+        awk -F= '/^KEYWORDS=/{n=split($2,a," "); for(i=1;i<=n;i++) if(a[i]=="amd64") ok=1} END{exit !ok}' "${f}" || continue
+        basename "${f}" | sed "s/^${pn}-//"
+    done | sort -V | tail -1
+}
+
 function syncrepo () {
 # try three times to sync
 if [ -d "${WORKDIR}/squashfs/var/db/repos/gentoo" ];then
@@ -264,13 +279,13 @@ fi
 
 # [gigos] 动态钉最新 amd64-stable 工具链(gcc)+ 内核 + zfs,免手工维护版本号:全局 ACCEPT_KEYWORDS="~amd64 *"
 # 默认挑最新测试版,实机踩过:内核 7.1.3 超 OpenZFS 上限、userland zfs-2.4.3 拖来 RC 模块、bleeding-edge
-# gcc-16 快照把 btrfs-progs 等包编挂。这里用 ACCEPT_KEYWORDS=amd64 让 portage 各自报出最新 stable 版本,
+# gcc-16 快照把 btrfs-progs 等包编挂。这里从树的 md5-cache 精确读各自最新 amd64-stable 版本(newest_stable),
 # 再把它之上的一切(测试版)mask 掉,portage 就停在 stable。两条兼容(内核 ≤ zfs-kmod 上限、zfs=zfs-kmod
 # 同版本)由 99-sanitize 出锅前硬断言兜底,真撞上也响亮毙锅、不静默出坏盘。改钉版策略就改这一段。
-KSTAB=$(crun ACCEPT_KEYWORDS=amd64 emerge -pq --nodeps sys-kernel/gentoo-kernel-bin 2>/dev/null | grep -oE 'gentoo-kernel-bin-[0-9][^ ]*' | tail -1 | sed -E 's/.*gentoo-kernel-bin-//; s/::.*//')
-ZSTAB=$(crun ACCEPT_KEYWORDS=amd64 emerge -pq --nodeps sys-fs/zfs 2>/dev/null | grep -oE 'sys-fs/zfs-[0-9][^ ]*' | tail -1 | sed -E 's#.*/zfs-##; s/::.*//')
-GSTAB=$(crun ACCEPT_KEYWORDS=amd64 emerge -pq --nodeps sys-devel/gcc 2>/dev/null | grep -oE 'sys-devel/gcc-[0-9][^ ]*' | tail -1 | sed -E 's#.*/gcc-##; s/::.*//')
-[ -n "${KSTAB}" ] && [ -n "${ZSTAB}" ] && [ -n "${GSTAB}" ] || { echo "[gigos] 致命:算不出 amd64-stable 内核/zfs/gcc 版本(树没同步好?),中止"; exit 1; }
+GSTAB=$(newest_stable sys-devel/gcc)
+KSTAB=$(newest_stable sys-kernel/gentoo-kernel-bin)
+ZSTAB=$(newest_stable sys-fs/zfs)
+[ -n "${KSTAB}" ] && [ -n "${ZSTAB}" ] && [ -n "${GSTAB}" ] || { echo "[gigos] 致命:算不出 amd64-stable 内核/zfs/gcc 版本(md5-cache 读不到?树没同步好?),中止"; exit 1; }
 ZKMAX=$(grep -oE 'MODULES_KERNEL_MAX=[0-9.]+' "${WORKDIR}/squashfs/var/db/repos/gentoo/sys-fs/zfs-kmod/zfs-kmod-${ZSTAB}.ebuild" 2>/dev/null | head -1 | cut -d= -f2)
 KMM=$(echo "${KSTAB}" | cut -d. -f1-2)
 echo "[gigos] 动态 stable 钉版:gcc ${GSTAB}、内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}(zfs-kmod 内核上限 ${ZKMAX:-未知})"
