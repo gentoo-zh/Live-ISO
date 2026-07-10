@@ -240,7 +240,10 @@ syncrepo
 # 上限、zfs=zfs-kmod 同版本)由 99-sanitize 出锅前硬断言兜底。改钉版策略就改这一段。
 GSTAB=$(newest_stable sys-devel/gcc)
 KSTAB=$(newest_stable sys-kernel/gentoo-kernel-bin)
-ZSTAB=$(newest_stable sys-fs/zfs)
+# ZSTAB 取【zfs-kmod】的最新 stable(不是 sys-fs/zfs 用户态):内核模块才是约束——userland 可能比 kmod 先稳定
+# (实机遇到 zfs-2.4.3 已 stable 但 zfs-kmod-2.4.3 还不存在,kmod 最新 stable 只到 2.3.6)。以 kmod 为准、
+# userland 跟到同版本(zfs-${ZSTAB} 也是 stable,且 Gentoo 用 ~zfs-kmod-${PV} 锁两者匹配)。
+ZSTAB=$(newest_stable sys-fs/zfs-kmod)
 [ -n "${KSTAB}" ] && [ -n "${ZSTAB}" ] && [ -n "${GSTAB}" ] || { echo "[gigos] 致命:算不出 amd64-stable 内核/zfs/gcc 版本(md5-cache 读不到?树没同步好?),中止"; exit 1; }
 ZKMAX=$(grep -oE 'MODULES_KERNEL_MAX=[0-9.]+' "${WORKDIR}/squashfs/var/db/repos/gentoo/sys-fs/zfs-kmod/zfs-kmod-${ZSTAB}.ebuild" 2>/dev/null | head -1 | cut -d= -f2)
 KMM=$(echo "${KSTAB}" | cut -d. -f1-2)
