@@ -232,6 +232,34 @@ cp --dereference /etc/resolv.conf "${WORKDIR}/squashfs"/etc/
 
 syncrepo
 
+# [gigos] 动态钉最新 amd64-stable 工具链(gcc)+ 内核 + zfs —— 必须放在【任何 emerge 之前】:下面 portage/git
+# 升级会用 -D 拖来 gcc,晚了 gcc-16 快照就先装进来了。全局 ACCEPT_KEYWORDS="~amd64 *" 默认挑最新测试版
+# (实机踩过:内核 7.1.3 超 OpenZFS 上限、zfs-2.4.3 拖 RC 模块、gcc-16 快照把 btrfs-progs 编挂)。从刚同步好的
+# 树的 md5-cache 精确读各自最新 amd64-stable 版本(newest_stable,不靠 ACCEPT_KEYWORDS——它是增量变量、会跟
+# make.conf 的 ~amd64 * 累加压不住),再 mask 掉其上的测试版,portage 就停在 stable。两条兼容(内核 ≤ zfs-kmod
+# 上限、zfs=zfs-kmod 同版本)由 99-sanitize 出锅前硬断言兜底。改钉版策略就改这一段。
+GSTAB=$(newest_stable sys-devel/gcc)
+KSTAB=$(newest_stable sys-kernel/gentoo-kernel-bin)
+ZSTAB=$(newest_stable sys-fs/zfs)
+[ -n "${KSTAB}" ] && [ -n "${ZSTAB}" ] && [ -n "${GSTAB}" ] || { echo "[gigos] 致命:算不出 amd64-stable 内核/zfs/gcc 版本(md5-cache 读不到?树没同步好?),中止"; exit 1; }
+ZKMAX=$(grep -oE 'MODULES_KERNEL_MAX=[0-9.]+' "${WORKDIR}/squashfs/var/db/repos/gentoo/sys-fs/zfs-kmod/zfs-kmod-${ZSTAB}.ebuild" 2>/dev/null | head -1 | cut -d= -f2)
+KMM=$(echo "${KSTAB}" | cut -d. -f1-2)
+echo "[gigos] 动态 stable 钉版:gcc ${GSTAB}、内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}(zfs-kmod 内核上限 ${ZKMAX:-未知})"
+if [ -n "${ZKMAX}" ] && [ "$(printf '%s\n%s\n' "${ZKMAX}" "${KMM}" | sort -V | tail -1)" = "${KMM}" ] && [ "${KMM}" != "${ZKMAX}" ];then
+    echo "[gigos] 警告:stable 内核 ${KMM} 超过 stable zfs-kmod 上限 ${ZKMAX},zfs-kmod 可能编不过(靠 99-sanitize 断言兜底)"
+fi
+mkdir -p "${WORKDIR}/squashfs/etc/portage/package.mask"
+cat > "${WORKDIR}/squashfs/etc/portage/package.mask/kernel-zfs" <<MASKEOF
+# 本文件由 build.sh 每锅动态生成:钉最新 amd64-stable gcc + 内核 + zfs,免手工维护(改法见 build.sh 生成它那段)。
+# 本锅算得:gcc ${GSTAB}、内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}。mask 掉算出的 stable 版之上的测试版,portage 停在 stable。
+>sys-devel/gcc-${GSTAB}
+>sys-kernel/gentoo-kernel-bin-${KSTAB}
+>sys-kernel/gentoo-kernel-${KSTAB}
+>sys-kernel/gentoo-sources-${KSTAB}
+>sys-fs/zfs-${ZSTAB}
+>sys-fs/zfs-kmod-${ZSTAB}
+MASKEOF
+
 # 先升级 portage。FEATURES="-merge-sync":portage 3.0.79 自升级时 _post_merge_sync 引用新版
 # 才有的 _SyncfsProcess 模块,运行中的旧 portage 没有 → ModuleNotFoundError、安装失败。
 # merge-sync 只为防断电丢数据,对 tmpfs 全内存构建无意义,关掉零损失。
@@ -276,33 +304,6 @@ else
     echo "        (否则会出无装机清理的盘:装好的系统残留 autologin / SSH 密码登录等 live 后门)"
     exit 1
 fi
-
-# [gigos] 动态钉最新 amd64-stable 工具链(gcc)+ 内核 + zfs,免手工维护版本号:全局 ACCEPT_KEYWORDS="~amd64 *"
-# 默认挑最新测试版,实机踩过:内核 7.1.3 超 OpenZFS 上限、userland zfs-2.4.3 拖来 RC 模块、bleeding-edge
-# gcc-16 快照把 btrfs-progs 等包编挂。这里从树的 md5-cache 精确读各自最新 amd64-stable 版本(newest_stable),
-# 再把它之上的一切(测试版)mask 掉,portage 就停在 stable。两条兼容(内核 ≤ zfs-kmod 上限、zfs=zfs-kmod
-# 同版本)由 99-sanitize 出锅前硬断言兜底,真撞上也响亮毙锅、不静默出坏盘。改钉版策略就改这一段。
-GSTAB=$(newest_stable sys-devel/gcc)
-KSTAB=$(newest_stable sys-kernel/gentoo-kernel-bin)
-ZSTAB=$(newest_stable sys-fs/zfs)
-[ -n "${KSTAB}" ] && [ -n "${ZSTAB}" ] && [ -n "${GSTAB}" ] || { echo "[gigos] 致命:算不出 amd64-stable 内核/zfs/gcc 版本(md5-cache 读不到?树没同步好?),中止"; exit 1; }
-ZKMAX=$(grep -oE 'MODULES_KERNEL_MAX=[0-9.]+' "${WORKDIR}/squashfs/var/db/repos/gentoo/sys-fs/zfs-kmod/zfs-kmod-${ZSTAB}.ebuild" 2>/dev/null | head -1 | cut -d= -f2)
-KMM=$(echo "${KSTAB}" | cut -d. -f1-2)
-echo "[gigos] 动态 stable 钉版:gcc ${GSTAB}、内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}(zfs-kmod 内核上限 ${ZKMAX:-未知})"
-if [ -n "${ZKMAX}" ] && [ "$(printf '%s\n%s\n' "${ZKMAX}" "${KMM}" | sort -V | tail -1)" = "${KMM}" ] && [ "${KMM}" != "${ZKMAX}" ];then
-    echo "[gigos] 警告:stable 内核 ${KMM} 超过 stable zfs-kmod 上限 ${ZKMAX},zfs-kmod 可能编不过(靠 99-sanitize 断言兜底)"
-fi
-mkdir -p "${WORKDIR}/squashfs/etc/portage/package.mask"
-cat > "${WORKDIR}/squashfs/etc/portage/package.mask/kernel-zfs" <<MASKEOF
-# 本文件由 build.sh 每锅动态生成:钉最新 amd64-stable gcc + 内核 + zfs,免手工维护(改法见 build.sh 生成它那段)。
-# 本锅算得:gcc ${GSTAB}、内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}。mask 掉算出的 stable 版之上的测试版,portage 停在 stable。
->sys-devel/gcc-${GSTAB}
->sys-kernel/gentoo-kernel-bin-${KSTAB}
->sys-kernel/gentoo-kernel-${KSTAB}
->sys-kernel/gentoo-sources-${KSTAB}
->sys-fs/zfs-${ZSTAB}
->sys-fs/zfs-kmod-${ZSTAB}
-MASKEOF
 
 # [gigos][zfs] zfs-kmod 从源码编需 /usr/src/linux 指向 dist-kernel 构建树(.config/Module.symvers +
 # /lib/modules/<ver>/build),这些符号链接由 gentoo-kernel-bin 的 pkg_postinst 建。在单次 @world 事务里
