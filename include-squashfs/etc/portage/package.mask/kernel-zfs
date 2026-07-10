@@ -1,13 +1,17 @@
-# 内核只用 amd64 STABLE、且 ≤ OpenZFS 支持上限,保证 zfs-kmod 稳编入。
-# 两条约束:
-#  1) stable:dist-kernel 的稳定版是 _pN 补丁修订(6.18.37_p1),纯点发布(6.18.38)全是 ~amd64 测试版。
-#     全局 ACCEPT_KEYWORDS 是 "~amd64 *",默认会挑最高的测试版内核;实机验证测试内核太新踩坑(7.1.3
-#     超 OpenZFS 上限 → zfs.ko 编不进、被 --keep-going 静默跳过、出锅装不了 ZFS)。故只留 stable。
-#  2) ZFS 兼容:OpenZFS 2.4.x 的 Linux-Maximum=7.0,内核 >=7.1 也编不过。stable 现在停在 6.18.x,天然 ≤7.0。
-# 做法:mask 掉 6.18.37_p1 之上的所有版本(6.18.38 起的测试版 + 7.x),portage 就落到最新 amd64-stable
-# = 6.18.37_p1(≤7.0,zfs-kmod 编得进)。
-# 维护:出了更新的 amd64-stable dist-kernel(或 OpenZFS 支持 7.1)后,把下面版本号往上抬即可。
-# 出锅前 99-sanitize 硬断言 zfs.ko 真在位,双保险防再次静默出不可装 ZFS 的盘。
+# 整套 ZFS 走 amd64 STABLE、且互相兼容,保证 zfs-kmod 稳编 + userland↔module 版本对齐。
+# 全局 ACCEPT_KEYWORDS="~amd64 *" 默认挑最新测试版,踩过两个实机坑:
+#   1) 内核测试版 7.1.3 超 OpenZFS 上限 → zfs.ko 编不进、被 --keep-going 静默跳过(装不了 ZFS)。
+#   2) userland 测试版 zfs-2.4.3 → 拖来 RC 模块 zfs-kmod-2.4.0_rc2,且跟 userland 对不齐版本
+#      (userland/kmod 必须同版本,Gentoo 用 ~sys-fs/zfs-kmod-${PV} 锁)→ 出锅 ZFS 照样不能用。
+# 做法(全 stable、彼此兼容):
+#   内核: 最新 amd64-stable dist-kernel = 6.18.37_p1(mask 掉 6.18.38 起的测试版点发布 + 7.x)。
+#   ZFS:  最新 amd64-stable = 2.3.6(userland + kmod 同为 2.3.6,mask 掉 2.3.7 起的测试版)。
+#         zfs-kmod-2.3.6 的 MODULES_KERNEL_MAX=6.19 ≥ 内核 6.18 → 编得进;两边同 2.3.6 → 版本对齐。
+# 维护: 出了更新的 amd64-stable 内核/ZFS(或要追新特性)后把版本号往上抬,注意保持
+#        内核 ≤ zfs-kmod 的 MODULES_KERNEL_MAX、且 zfs 与 zfs-kmod 同版本。
+# 出锅前 99-sanitize 硬验 zfs.ko 在位【且】userland/kmod 版本一致,双保险。
 >=sys-kernel/gentoo-kernel-bin-6.18.38
 >=sys-kernel/gentoo-kernel-6.18.38
 >=sys-kernel/gentoo-sources-6.18.38
+>=sys-fs/zfs-2.3.7
+>=sys-fs/zfs-kmod-2.3.7

@@ -130,7 +130,13 @@ if [ -x "${SQROOT}/usr/bin/generate-zbm" ] || [ -x "${SQROOT}/usr/sbin/generate-
         || { echo "[99-sanitize] 致命:装了 ZFS 用户态/ZBM 但内核 ${KMODVER:-?} 没有 zfs.ko(内核多半超了 OpenZFS 支持上限、zfs-kmod 被静默跳过)→ 出锅装不了 ZFS,中止(见 package.mask/kernel-zfs 的内核钉版)"; exit 1; }
     find "${SQROOT}/lib/modules/${KMODVER}" -name 'spl.ko*' 2>/dev/null | grep -q . \
         || echo "[99-sanitize] 提示:${KMODVER} 有 zfs.ko 但无独立 spl.ko(较新 OpenZFS 把 spl 并进 zfs.ko,正常)"
-    echo "[99-sanitize] 安全断言通过:ZFS 根装机契约已接(zfs.ko 在 ${KMODVER}、ZBM 工具/脚本/序列/config 齐备、shellprocess@zfs 在 bootloader 之后)"
+    # userland 与内核模块必须同版本:ZFS 要求 zfs 工具和 zfs.ko 版本一致(测试版曾错配 userland 2.4.3 + kmod 2.3.8,
+    # 版本不齐 ZFS 就不能用,而单查 zfs.ko 在不在会漏掉)。比对已装的 sys-fs/zfs 与 sys-fs/zfs-kmod 版本。
+    ZV=$(ls -d "${SQROOT}"/var/db/pkg/sys-fs/zfs-[0-9]* 2>/dev/null | head -1 | sed -E 's#.*/zfs-##')
+    ZKV=$(ls -d "${SQROOT}"/var/db/pkg/sys-fs/zfs-kmod-[0-9]* 2>/dev/null | head -1 | sed -E 's#.*/zfs-kmod-##')
+    { [ -n "${ZV}" ] && [ "${ZV}" = "${ZKV}" ]; } \
+        || { echo "[99-sanitize] 致命:zfs userland(${ZV:-无}) 与 zfs-kmod(${ZKV:-无}) 版本不一致 → ZFS 不能用,中止(见 package.mask/kernel-zfs 的 ZFS 钉版)"; exit 1; }
+    echo "[99-sanitize] 安全断言通过:ZFS 根装机契约已接(zfs.ko 在 ${KMODVER}、userland=kmod=${ZV}、ZBM 工具/脚本/序列/config 齐备、shellprocess@zfs 在 bootloader 之后)"
 else
     echo "[99-sanitize] 提示:本锅未含 generate-zbm(zfsbootmenu 未装,可能 --keep-going 跳过)→ 跳过 ZFS 根装机断言;ZFS 根安装将不可启动,非 ZFS 安装不受影响"
 fi
