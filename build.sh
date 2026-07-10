@@ -262,6 +262,31 @@ else
     exit 1
 fi
 
+# [gigos] 动态钉最新 amd64-stable 内核 + zfs,免手工维护版本号:全局 ACCEPT_KEYWORDS="~amd64 *" 默认会挑
+# 最新测试版(实机踩过内核 7.1.3 超 OpenZFS 上限、userland zfs-2.4.3 拖来 RC 模块两个坑)。这里用
+# ACCEPT_KEYWORDS=amd64 让 portage 各自报出最新 stable 版本,再把它之上的一切(测试版)mask 掉,portage
+# 就停在 stable。两条兼容(内核 ≤ zfs-kmod 上限、zfs=zfs-kmod 同版本)由 99-sanitize 出锅前硬断言兜底,
+# 真撞上「stable 内核冲过 zfs-kmod 上限」也是响亮毙锅、不静默出坏盘。改钉版策略就改这一段。
+KSTAB=$(crun ACCEPT_KEYWORDS=amd64 emerge -pq --nodeps sys-kernel/gentoo-kernel-bin 2>/dev/null | grep -oE 'gentoo-kernel-bin-[0-9][^ ]*' | tail -1 | sed -E 's/.*gentoo-kernel-bin-//; s/::.*//')
+ZSTAB=$(crun ACCEPT_KEYWORDS=amd64 emerge -pq --nodeps sys-fs/zfs 2>/dev/null | grep -oE 'sys-fs/zfs-[0-9][^ ]*' | tail -1 | sed -E 's#.*/zfs-##; s/::.*//')
+[ -n "${KSTAB}" ] && [ -n "${ZSTAB}" ] || { echo "[gigos] 致命:算不出 amd64-stable 内核/zfs 版本(树没同步好?),中止"; exit 1; }
+ZKMAX=$(grep -oE 'MODULES_KERNEL_MAX=[0-9.]+' "${WORKDIR}/squashfs/var/db/repos/gentoo/sys-fs/zfs-kmod/zfs-kmod-${ZSTAB}.ebuild" 2>/dev/null | head -1 | cut -d= -f2)
+KMM=$(echo "${KSTAB}" | cut -d. -f1-2)
+echo "[gigos] 动态 stable 钉版:内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}(zfs-kmod 内核上限 ${ZKMAX:-未知})"
+if [ -n "${ZKMAX}" ] && [ "$(printf '%s\n%s\n' "${ZKMAX}" "${KMM}" | sort -V | tail -1)" = "${KMM}" ] && [ "${KMM}" != "${ZKMAX}" ];then
+    echo "[gigos] 警告:stable 内核 ${KMM} 超过 stable zfs-kmod 上限 ${ZKMAX},zfs-kmod 可能编不过(靠 99-sanitize 断言兜底)"
+fi
+mkdir -p "${WORKDIR}/squashfs/etc/portage/package.mask"
+cat > "${WORKDIR}/squashfs/etc/portage/package.mask/kernel-zfs" <<MASKEOF
+# 本文件由 build.sh 每锅动态生成:钉最新 amd64-stable 内核 + zfs,免手工维护(改法见 build.sh 生成它那段)。
+# 本锅算得:内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}。mask 掉算出的 stable 版之上的一切,portage 停在 stable。
+>sys-kernel/gentoo-kernel-bin-${KSTAB}
+>sys-kernel/gentoo-kernel-${KSTAB}
+>sys-kernel/gentoo-sources-${KSTAB}
+>sys-fs/zfs-${ZSTAB}
+>sys-fs/zfs-kmod-${ZSTAB}
+MASKEOF
+
 # [gigos][zfs] zfs-kmod 从源码编需 /usr/src/linux 指向 dist-kernel 构建树(.config/Module.symvers +
 # /lib/modules/<ver>/build),这些符号链接由 gentoo-kernel-bin 的 pkg_postinst 建。在单次 @world 事务里
 # zfs 的 pkg_setup 可能早于内核 postinst 跑 →「kernel needs to be rebuilt」失败(nvidia 走 binpkg、
