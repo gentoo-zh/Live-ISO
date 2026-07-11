@@ -266,10 +266,15 @@ mkdir -p "${WORKDIR}/squashfs/etc/portage/package.mask"
 cat > "${WORKDIR}/squashfs/etc/portage/package.mask/kernel-zfs" <<MASKEOF
 # 本文件由 build.sh 每锅动态生成:钉最新 amd64-stable gcc + 内核 + zfs,免手工维护(改法见 build.sh 生成它那段)。
 # 本锅算得:gcc ${GSTAB}、内核 ${KSTAB}、zfs/zfs-kmod ${ZSTAB}。mask 掉算出的 stable 版之上的测试版,portage 停在 stable。
+# vanilla-kernel 必须一起 mask:sys-fs/zfs[dist-kernel] 依赖【无版本】的 virtual/dist-kernel,-uD @world 会挑
+# 版本最高的 provider 来满足它。gentoo-kernel-bin 钉在 ${KSTAB} 了,但 vanilla-kernel 没钉 → 实机上被拖来
+# vanilla-kernel-7.1.3(装出第二个内核 /lib/modules/7.1.3-dist),它超 OpenZFS 上限、没 zfs.ko,被 99-sanitize
+# 逮住中止。把 vanilla-kernel 也钉到 ${KSTAB},virtual/dist-kernel 就只能落到 gentoo-kernel-bin-${KSTAB}(world 里已有)。
 >sys-devel/gcc-${GSTAB}
 >sys-kernel/gentoo-kernel-bin-${KSTAB}
 >sys-kernel/gentoo-kernel-${KSTAB}
 >sys-kernel/gentoo-sources-${KSTAB}
+>sys-kernel/vanilla-kernel-${KSTAB}
 >sys-fs/zfs-${ZSTAB}
 >sys-fs/zfs-kmod-${ZSTAB}
 MASKEOF
