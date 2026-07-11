@@ -1,0 +1,4 @@
+# calamares-settings-gig 的 settings/shellprocess schema 只对齐过 calamares 3.3.14-r8(fork 验证过的版本)。
+# 全局 ACCEPT_KEYWORDS="~amd64 *" 会拖来更新的 3.4.x,schema 可能失配、装机流程会炸,verify-iso.sh 也硬查
+# 版本必须是 3.3.14-r8。钉死它。将来要升 calamares:先验证 settings 兼容新版,再同步改这里和 verify-iso.sh。
+>app-admin/calamares-3.3.14-r8

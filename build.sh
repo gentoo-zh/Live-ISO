@@ -233,10 +233,13 @@ mounttmpfs
 # 直接用 localedef 生成需要的两个真 locale(不走 locale-gen:它会强行把内建的 C.UTF-8 也算进去,而纯
 # stage3 里 C.UTF-8 编不出 → 「not all compiled」中止整锅;C.UTF-8 是内建 locale,本就无需生成)。
 # localedef 遇字符集告警也可能返回非零,故不看退出码,改断言 zh_CN 真生成出来了(它才是构建 LANG 依赖的)。
+# 三语 ISO=简/繁/英,三个都要真编进 locale-archive(verify-iso.sh 硬查 zh_CN.utf8 + zh_TW.utf8;
+# 少了中文会回退 C)。glibc 自己的 postinst locale-gen 在纯 stage3 里会 abort(见上),故这里自己 localedef。
 crun localedef -i en_US -f UTF-8 en_US.UTF-8 || true
 crun localedef -i zh_CN -f UTF-8 zh_CN.UTF-8 || true
-crun locale -a 2>/dev/null | grep -qi '^zh_CN' || { echo "[gigos] 致命:zh_CN.UTF-8 locale 没能生成,man/sphinx 会编挂,中止"; exit 1; }
-echo "[gigos] locale 就绪:$(crun locale -a 2>/dev/null | grep -iE '^en_US|^zh_CN' | tr '\n' ' ')"
+crun localedef -i zh_TW -f UTF-8 zh_TW.UTF-8 || true
+{ crun locale -a 2>/dev/null | grep -qi '^zh_CN' && crun locale -a 2>/dev/null | grep -qi '^zh_TW'; } || { echo "[gigos] 致命:zh_CN/zh_TW.UTF-8 locale 没能生成,man/sphinx 会编挂、ISO 中文回退 C,中止"; exit 1; }
+echo "[gigos] locale 就绪:$(crun locale -a 2>/dev/null | grep -iE '^en_US|^zh_CN|^zh_TW' | tr '\n' ' ')"
 
 # DNS
 cp --dereference /etc/resolv.conf "${WORKDIR}/squashfs"/etc/
