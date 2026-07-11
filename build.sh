@@ -227,6 +227,17 @@ rsync -rl --copy-unsafe-links "${WORKDIR}"/include-squashfs/* "${WORKDIR}/squash
 refreshconfig
 mounttmpfs
 
+# [gigos] 生成 locale。fork 出的是中文 ISO(locale.conf=zh_CN.UTF-8),却一直没带 locale.gen,该 locale
+# 从没生成过。构建期 btrfs-progs 的 man 走 sphinx(python),按 LANG 调 setlocale('') 读到未生成的
+# zh_CN.UTF-8 → locale.Error、man 编译失败(实机卡在 btrfs-progs 并连累依赖它的 calamares-settings-gig)。
+# 直接用 localedef 生成需要的两个真 locale(不走 locale-gen:它会强行把内建的 C.UTF-8 也算进去,而纯
+# stage3 里 C.UTF-8 编不出 → 「not all compiled」中止整锅;C.UTF-8 是内建 locale,本就无需生成)。
+# localedef 遇字符集告警也可能返回非零,故不看退出码,改断言 zh_CN 真生成出来了(它才是构建 LANG 依赖的)。
+crun localedef -i en_US -f UTF-8 en_US.UTF-8 || true
+crun localedef -i zh_CN -f UTF-8 zh_CN.UTF-8 || true
+crun locale -a 2>/dev/null | grep -qi '^zh_CN' || { echo "[gigos] 致命:zh_CN.UTF-8 locale 没能生成,man/sphinx 会编挂,中止"; exit 1; }
+echo "[gigos] locale 就绪:$(crun locale -a 2>/dev/null | grep -iE '^en_US|^zh_CN' | tr '\n' ' ')"
+
 # DNS
 cp --dereference /etc/resolv.conf "${WORKDIR}/squashfs"/etc/
 
